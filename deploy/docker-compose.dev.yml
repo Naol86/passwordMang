@@ -1,0 +1,21 @@
+# Local development: PostgreSQL only. Run the server and web app on the host.
+#   docker compose -f deploy/docker-compose.dev.yml up -d
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: pm
+      POSTGRES_PASSWORD: pm-dev-only
+      POSTGRES_DB: pm
+    ports:
+      - "5433:5432"
+    volumes:
+      - pm-dev-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pm -d pm"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pm-dev-db:
