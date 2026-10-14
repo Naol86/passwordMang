@@ -593,7 +593,7 @@ The back end is a stateless Go service using the Gin framework on PostgreSQL. Th
 | --- | --- | --- |
 | API server | Go + Gin, `pgx` driver, `sqlc` for typed queries | Fast, single static binary, easy to scale horizontally |
 | Database | PostgreSQL 16 with row-level security on `org_id` as a second guard | One dependency; RLS backs up application checks (ORG-04) |
-| Migrations | `goose`, embedded in the binary, run on start | Forward-only, versioned (OPS-04) |
+| Migrations | `goose`, embedded in the binary, run on start | Additive, versioned, with a Down step for development (OPS-04) |
 | Background jobs | `river` (Postgres-backed queue) | Grant expiry, emails, key rotation without needing Redis |
 | Real-time sync | Server-sent events; Postgres `LISTEN/NOTIFY` to fan out across nodes | Works behind any proxy; no extra broker (NFR-07) |
 | Sessions | Random session tokens, stored hashed, revocable; httpOnly cookie for web, bearer token for CLI and extension; every body also encrypted with the session key (9.3) | Instant revocation (AUTH-07) |
@@ -608,7 +608,7 @@ The back end is a stateless Go service using the Gin framework on PostgreSQL. Th
 ### 13.1 Repository layout
 
 ```text
-/server        Go API (Gin): cmd/, internal/<domain>/, migrations/
+/server        Go API (Gin), clean architecture: cmd/, internal/{domain,app,adapter}/, migrations/
 /web           React + Tailwind + shadcn/ui web app
 /extension     Chrome and Firefox extension (WXT)
 /cli           Go CLI (pm)
@@ -621,9 +621,9 @@ The back end is a stateless Go service using the Gin framework on PostgreSQL. Th
 
 ### 13.2 Back-end conventions
 
-- One package per domain under `internal/` (auth, org, member, group, role, folder, item, grant, env, audit); each has handler, service and store layers.
+- Clean architecture: `internal/domain` (entities and pure rules), `internal/app` (use cases and their ports), `internal/adapter` (Gin handlers, Postgres repositories, mail, jobs). Dependencies point inward only, enforced by a linter rule.
 - Every request runs inside a transaction that sets `app.org_id`, which the row-level-security policies check.
-- Permission checks live in the service layer, never only in handlers (RBAC-05).
+- Permission checks live in the use cases, never only in handlers (RBAC-05).
 - The server never receives plaintext secrets, so it never logs request bodies of item or environment endpoints.
 
 ## 14. Self-hosting and deployment
@@ -648,7 +648,7 @@ A company should go from a fresh Linux server to a working instance with one `do
 | OPS-01 | Official images for amd64 and arm64, published to a public registry, signed. | MVP |
 | OPS-02 | Docker Compose file with the app, PostgreSQL and a reverse proxy with automatic Let's Encrypt TLS (Caddy). | MVP |
 | OPS-03 | All configuration through environment variables or a single config file; every option documented with its default. | MVP |
-| OPS-04 | Database migrations run automatically on start, are forward-only and tested from every previous minor version. | MVP |
+| OPS-04 | Database migrations run automatically on start, are additive, include a Down step for development rollbacks, and are tested from every previous minor version. Destructive changes ship as expand, migrate data, then contract, across releases. | MVP |
 | OPS-05 | Backup and restore commands for database and attachments, with a documented restore drill. Backups contain only ciphertext. | MVP |
 | OPS-06 | Health and readiness endpoints; Prometheus metrics (request rates, latency, errors, job queue); structured JSON logs without secrets. | MVP |
 | OPS-07 | Helm chart for Kubernetes with multiple replicas, external PostgreSQL and S3. | v1 |
