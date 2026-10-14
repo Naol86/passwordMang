@@ -1,0 +1,23 @@
+# Hot reload on the host (make dev-watch). air rebuilds and restarts the
+# server when Go code, SQL migrations or queries change.
+root = "."
+tmp_dir = ".air"
+
+[build]
+  cmd = "go build -o .air/server ./cmd/server"
+  entrypoint = [".air/server"]
+  include_ext = ["go", "sql"]
+  exclude_dir = [".air", "bin"]
+  exclude_regex = ["_test\\.go$"]
+  # Group a burst of saves (or make generate) into one rebuild.
+  delay = 500
+  # SIGINT first, so the server shuts down gracefully and frees its ports.
+  send_interrupt = true
+  kill_delay = "5s"
+  stop_on_error = true
+
+[log]
+  time = true
+
+[misc]
+  clean_on_exit = true

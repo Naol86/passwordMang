@@ -45,6 +45,8 @@ Sizes are relative (S < M < L), not time estimates.
 
 ## Phase 0 · Foundations
 
+**Status:** done on 2026-10-14. Not yet committed; CI has not run on GitHub yet.
+
 **Goal:** an empty but production-shaped service: it builds, lints, tests against real PostgreSQL in CI, and serves health checks.
 
 Already done: Go module, Gin router with `/healthz`, `/readyz`, `/api/v1/meta`, config from env vars, embedded goose migrations, draft schema, Dockerfile, dev Compose file with PostgreSQL.
@@ -52,15 +54,16 @@ Already done: Go module, Gin router with `/healthz`, `/readyz`, `/api/v1/meta`, 
 **Deliverables**
 - `Makefile` targets: `dev`, `test`, `lint`, `generate`, `migrate`, `check`.
 - `golangci-lint` config; `sqlc` config and the first query file; `oapi-codegen` generating Gin server interfaces from `spec/openapi.yaml`.
-- Clean-architecture skeleton: `internal/domain`, `internal/app`, `internal/adapter/{http,postgres,mail,jobs,clock,random}`, with `cmd/server` as the composition root. The existing `internal/httpapi` and `internal/database` packages move into `adapter/http` and `adapter/postgres`.
+- Clean-architecture skeleton: `internal/domain`, `internal/app`, `internal/adapter/{httpapi,postgres,mail,jobs,system}`, with `cmd/server` as the composition root. The existing `internal/httpapi` and `internal/database` packages move into `adapter/httpapi` and `adapter/postgres`.
 - `depguard` rules in `golangci-lint` that fail the build if the domain imports app or adapters, or if app imports adapters.
-- `adapter/http`: standard error shape, domain-error-to-status mapping, request IDs, body-size limit, cursor pagination helpers.
+- `adapter/httpapi`: standard error shape, domain-error-to-status mapping, request IDs, body-size limit, cursor pagination helpers.
 - `adapter/postgres`: the `TxRunner` that opens transactions and sets `app.org_id` for row-level security.
-- Clock and random ports with real adapters and fakes for tests.
+- Clock and random ports with real adapters (`adapter/system`) and fakes for tests.
 - `internal/testdb`: creates a fresh, migrated database per test package from a template database.
 - `adapter/jobs`: River queue set up (needed for emails in phase 2).
 - `adapter/mail`: SMTP mailer; Mailpit added to the dev Compose file for local email.
-- Prometheus `/metrics` (OPS-06), JSON logs without bodies.
+- Prometheus `/metrics` on a separate internal port (OPS-06), including database connection-pool metrics; JSON logs without bodies.
+- Docker Compose dev stack with PostgreSQL, Mailpit, Prometheus, and Grafana with a provisioned server dashboard (HTTP traffic, errors, latency, database pool, Go runtime). `make up` starts the services; `make dev` runs the server on the host with `go run` (`make dev-watch` adds auto-restart); `make start` runs everything in Docker with the production image and a smoke check.
 - CI (GitHub Actions): lint, `go test -race`, `govulncheck`, `sqlc generate` with no diff, Docker build.
 
 **Exit criteria:** `make check` passes locally and in CI; one sample integration test runs against the test database.

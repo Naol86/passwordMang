@@ -1,0 +1,19 @@
+# Prometheus scrape config for the dev stack. Production operators can reuse the
+# pm-server job with their own Prometheus; the server exposes metrics on PM_METRICS_ADDR.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # The server runs either in Docker (make start) or on the host (make dev), so both
+  # addresses are listed; the one not in use simply shows as down.
+  - job_name: pm-server
+    static_configs:
+      - targets: ["server:9090"]
+        labels: { runs_in: docker }
+      - targets: ["host.docker.internal:9090"]
+        labels: { runs_in: host }
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

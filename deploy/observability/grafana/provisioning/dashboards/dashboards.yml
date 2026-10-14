@@ -1,0 +1,11 @@
+apiVersion: 1
+
+# Dashboards are files in the repository; edit the JSON (or export from the UI) and commit it.
+providers:
+  - name: password-manager
+    folder: Password Manager
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards

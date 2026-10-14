@@ -1,0 +1,14 @@
+# Generates Gin server interfaces and models from the shared API contract.
+# Run with: make generate
+package: apigen
+output: internal/adapter/httpapi/apigen/api.gen.go
+generate:
+  gin-server: true
+  strict-server: true
+  models: true
+output-options:
+  # Keep shared schemas such as Error even before an operation references them.
+  skip-prune: true
+compatibility:
+  # Enum constants like StatusStatusOk instead of Ok, so names never collide across schemas.
+  always-prefix-enum-values: true

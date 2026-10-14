@@ -9,9 +9,9 @@ Dependencies point inward only: adapters depend on use cases, use cases depend o
 ```mermaid
 flowchart LR
   subgraph Adapters["Adapters (outer)"]
-    HTTP["http: Gin handlers,<br/>session middleware"]
+    HTTP["httpapi: Gin handlers,<br/>session middleware"]
     PG["postgres: repositories (sqlc)"]
-    EXT["mail, jobs, clock, random"]
+    EXT["mail, jobs, system clock and randomness"]
   end
   UC["Use cases (app)<br/>orchestration, permissions,<br/>transactions, audit;<br/>declares ports"]
   DOM["Domain<br/>entities, rules, errors"]
@@ -31,12 +31,17 @@ internal/domain/<feature>/      entities, value objects, domain errors, pure rul
                                 (e.g. grant.EffectiveLevel, authz permission matrix, folder depth rule)
 internal/app/<feature>/         use cases: one exported method per operation, input/output types,
                                 and the ports (interfaces) the feature needs
-internal/adapter/http/          Gin router, generated OpenAPI server, session-channel middleware
-internal/adapter/http/<feature>/  handlers: map HTTP <-> use-case input/output, errors -> status
-internal/adapter/postgres/      pool, transaction runner, row-level-security setup
-internal/adapter/postgres/<feature>/  repositories implementing the app ports with sqlc
-internal/adapter/{mail,jobs,clock,random}/  SMTP, River, real clock and randomness
-internal/platform/              framework-free helpers shared by adapters: config, logging, metrics
+internal/adapter/httpapi/       Gin router, middleware, error mapping, metrics, session-channel middleware
+  apigen/                       generated from spec/openapi.yaml (make generate); never edit
+  <feature>.go                  handlers: map HTTP <-> use-case input/output, errors -> status
+internal/adapter/postgres/      pool, migrations, TxRunner (sets app.org_id for row-level security)
+  sqlcgen/                      generated from queries/ (make generate); never edit
+  <feature>/                    repositories implementing the app ports with sqlc
+internal/adapter/jobs/          River queue and workers; Outbox implements app/notify.Outbox
+internal/adapter/mail/          SMTP sender
+internal/adapter/system/        real clock and crypto/rand randomness
+internal/platform/              config (env vars, *_FILE secrets) and logging
+internal/testdb/                fresh migrated PostgreSQL database per test
 pkg/vaultcrypto/                crypto formats shared with the CLI (no project imports)
 queries/                        sqlc .sql files, one per feature
 migrations/                     goose migrations, embedded in the binary
@@ -73,6 +78,7 @@ Features: account, auth, session, org, member, invite, role, group, folder, item
 | 403 | Signed in, but the role or grant does not allow the action |
 | 404 | Not found, **or** belongs to another organization (never reveal it exists) |
 | 409 | Revision conflict on concurrent edits (NFR-08), duplicate name |
+| 413 | Request body over the limit (1 MB by default) |
 | 429 | Rate limited |
 | 500 | Unexpected; generic message to the client, details in logs with the request ID |
 
@@ -88,6 +94,12 @@ Features: account, auth, session, org, member, invite, role, group, folder, item
 - Never log request or response bodies. Use `slog` with structured fields; IDs, not emails.
 - Rate-limit sign-in, MFA, invite and account-creation endpoints (AUTH-08).
 - Time comes from the injected clock; randomness from `crypto/rand` via the injected source.
+- Job arguments are stored as plain JSON in the queue table. Never put secrets (invite tokens, reset links) in them; a job that needs one generates it when it runs.
+
+## Metrics
+- Every new feature adds the metrics an operator needs to see it working: counters for outcomes, histograms for latency. Names start with `pm_`, use snake_case, and counters end in `_total`.
+- Labels have small, fixed value sets: route templates, status codes, job kinds. Never IDs, emails, org slugs or raw paths.
+- When a metric matters to operators, add a panel to `deploy/observability/grafana/dashboards/pm-server.json` in the same change.
 
 ## Tests
 - Table-driven tests. Domain rules get plain unit tests. Use cases are tested with in-memory fakes of their ports (repositories, clock, random, mailer).
@@ -96,6 +108,7 @@ Features: account, auth, session, org, member, invite, role, group, folder, item
 
 ## Checks to run
 ```bash
-gofmt -l . && go vet ./... && golangci-lint run && go test -race ./...
+make check            # lint (incl. layer rules), vet, all tests against PostgreSQL and Mailpit
+make generate-check   # generated sqlc and OpenAPI code is up to date
 ```
-Also run `sqlc generate` and confirm it produces no diff.
+`make help` lists everything. Day to day: `make dev` (or `make dev-watch` for auto-restart) runs the server on the host with `go run` against the Docker services from `make up`. Before handing work back, `make start` builds the production image, runs the whole stack in Docker and smoke-checks it.

@@ -650,7 +650,7 @@ A company should go from a fresh Linux server to a working instance with one `do
 | OPS-03 | All configuration through environment variables or a single config file; every option documented with its default. | MVP |
 | OPS-04 | Database migrations run automatically on start, are additive, include a Down step for development rollbacks, and are tested from every previous minor version. Destructive changes ship as expand, migrate data, then contract, across releases. | MVP |
 | OPS-05 | Backup and restore commands for database and attachments, with a documented restore drill. Backups contain only ciphertext. | MVP |
-| OPS-06 | Health and readiness endpoints; Prometheus metrics (request rates, latency, errors, job queue); structured JSON logs without secrets. | MVP |
+| OPS-06 | Health and readiness endpoints; Prometheus metrics (request rates, latency, errors, database pool, job queue) on a separate internal port; a ready-made Prometheus config and Grafana dashboard in `deploy/observability`; structured JSON logs without secrets. | MVP |
 | OPS-07 | Helm chart for Kubernetes with multiple replicas, external PostgreSQL and S3. | v1 |
 | OPS-08 | Works fully offline (air-gapped): no calls home, no external fonts or CDNs; breach check and update check can be switched off. | MVP |
 | OPS-09 | Semantic versioning, changelog per release, at least 6 months of security fixes for each minor release. | v1 |

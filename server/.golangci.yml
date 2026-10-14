@@ -1,0 +1,66 @@
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - depguard
+    - errorlint
+    - gosec
+    - misspell
+    - noctx
+    - nolintlint
+    - revive
+    - unconvert
+  settings:
+    depguard:
+      # Clean architecture: dependencies point inward only (server/CLAUDE.md).
+      rules:
+        domain:
+          files: ["**/internal/domain/**/*.go"]
+          deny:
+            - pkg: passwordmanage/server/internal/app
+              desc: the domain must not depend on use cases
+            - pkg: passwordmanage/server/internal/adapter
+              desc: the domain must not depend on adapters
+            - pkg: passwordmanage/server/internal/platform
+              desc: the domain must not depend on infrastructure
+            - pkg: github.com/gin-gonic/gin
+              desc: the domain must not know about HTTP
+            - pkg: github.com/jackc/pgx
+              desc: the domain must not know about the database
+            - pkg: github.com/riverqueue/river
+              desc: the domain must not know about the job queue
+        app:
+          files: ["**/internal/app/**/*.go"]
+          deny:
+            - pkg: passwordmanage/server/internal/adapter
+              desc: use cases must depend on ports, not adapters
+            - pkg: github.com/gin-gonic/gin
+              desc: use cases must not know about HTTP
+            - pkg: github.com/jackc/pgx
+              desc: use cases must not know about the database driver
+            - pkg: github.com/riverqueue/river
+              desc: use cases must not know about the job queue
+  exclusions:
+    generated: lax
+    paths:
+      - internal/adapter/httpapi/apigen
+      - internal/adapter/postgres/sqlcgen
+    rules:
+      # Tests may use dynamic SQL and fixed fake values.
+      - path: _test\.go
+        linters: [gosec]
+      # Doc comments on every exported name would mostly restate the name; our rule is comments explain why.
+      - linters: [revive]
+        text: "^exported: "
+      - linters: [revive]
+        text: "^package-comments: "
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes: [passwordmanage/server]

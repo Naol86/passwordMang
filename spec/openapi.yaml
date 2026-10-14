@@ -1,0 +1,120 @@
+openapi: 3.0.3
+info:
+  title: Password Manager API
+  version: 0.1.0
+  description: |
+    API contract for the server. Payloads below are shown decrypted: after sign-in,
+    every request and response body travels inside the encrypted session envelope
+    (requirements SES-02). Only the endpoints tagged `public` accept plaintext (SES-07).
+
+    Errors always use the `Error` schema. List endpoints use cursor pagination with
+    the `limit` and `cursor` parameters.
+servers:
+  - url: /
+tags:
+  - name: public
+    description: Plaintext endpoints that need no session.
+
+paths:
+  /healthz:
+    get:
+      operationId: getHealthz
+      tags: [public]
+      summary: Liveness check; the process is up.
+      responses:
+        "200":
+          description: Alive.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Status" }
+
+  /readyz:
+    get:
+      operationId: getReadyz
+      tags: [public]
+      summary: Readiness check; the process can reach the database.
+      responses:
+        "200":
+          description: Ready.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Status" }
+        "503":
+          description: Not ready.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Status" }
+
+  /api/v1/meta:
+    get:
+      operationId: getMeta
+      tags: [public]
+      summary: Server version information.
+      responses:
+        "200":
+          description: Server metadata.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Meta" }
+
+components:
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Page size, 1 to 200. Defaults to 50.
+      schema: { type: integer, minimum: 1, maximum: 200 }
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque cursor from the previous page's `nextCursor`.
+      schema: { type: string }
+
+  schemas:
+    Status:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, unavailable]
+
+    Meta:
+      type: object
+      required: [version, apiVersion]
+      properties:
+        version: { type: string, example: "0.1.0" }
+        apiVersion: { type: string, example: "v1" }
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { $ref: "#/components/schemas/ErrorDetail" }
+
+    ErrorDetail:
+      type: object
+      required: [code, message, requestId]
+      properties:
+        code:
+          type: string
+          description: Stable snake_case identifier clients can switch on.
+          example: grant_expired
+        message:
+          type: string
+          description: Human-readable, safe to show to users.
+        requestId:
+          type: string
+          description: Quote this when reporting a problem.
+        fields:
+          type: array
+          items: { $ref: "#/components/schemas/FieldError" }
+
+    FieldError:
+      type: object
+      required: [field, message]
+      properties:
+        field: { type: string }
+        message: { type: string }

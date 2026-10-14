@@ -1,5 +1,7 @@
 # Front-end rules (React + TypeScript + Vite + Tailwind + shadcn/ui)
 
+Package manager: **pnpm**. Use `pnpm add`, `pnpm dlx`, `pnpm <script>`; never npm or yarn, and never edit `pnpm-lock.yaml` by hand.
+
 Applies on top of the root [CLAUDE.md](../CLAUDE.md).
 
 ## Layout
@@ -47,5 +49,5 @@ None for UI unless the user asks. Code in `packages/crypto` and `packages/api-cl
 
 ## Checks to run
 ```bash
-npm run typecheck && npm run lint && npm run build
+pnpm lint && pnpm build   # build runs tsc -b, so it type-checks too
 ```

@@ -1,0 +1,8 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+*.local
+/server/bin/
+/server/coverage.out
+/server/.air/

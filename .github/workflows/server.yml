@@ -1,0 +1,67 @@
+name: server
+
+on:
+  push:
+    branches: [main]
+    paths: ["server/**", "spec/**", "deploy/**", ".github/workflows/server.yml"]
+  pull_request:
+    paths: ["server/**", "spec/**", "deploy/**", ".github/workflows/server.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: pm
+          POSTGRES_PASSWORD: pm-dev-only
+          POSTGRES_DB: pm
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U pm -d pm"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      mailpit:
+        image: axllent/mailpit:v1.31.5
+        ports: ["1025:1025", "8025:8025"]
+
+    env:
+      PM_TEST_DATABASE_URL: postgres://pm:pm-dev-only@localhost:5433/pm?sslmode=disable
+      PM_TEST_SMTP_HOST: localhost
+      PM_TEST_MAILPIT_URL: http://localhost:8025
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: go.mod is tidy
+        run: make tidy-check
+
+      - name: Generated code is up to date
+        run: make generate-check
+
+      - name: Lint (includes clean-architecture layer rules)
+        run: make lint
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race -count=1 ./...
+
+      - name: Vulnerability scan
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./...
+
+      - name: Docker image builds
+        run: docker build --target runtime -t pm-server:ci .

@@ -1,6 +1,6 @@
 # Browser extension rules (WXT, Manifest V3, Chrome + Firefox)
 
-Applies on top of the root [CLAUDE.md](../CLAUDE.md). TypeScript, React, styling and i18n rules from [web/CLAUDE.md](../web/CLAUDE.md) also apply to the popup and options pages.
+Applies on top of the root [CLAUDE.md](../CLAUDE.md). Package manager: **pnpm**, as in the web app. TypeScript, React, styling and i18n rules from [web/CLAUDE.md](../web/CLAUDE.md) also apply to the popup and options pages.
 
 ## Architecture
 - **Background service worker:** owns the session, the session key, the decrypted vault and all API calls.
@@ -31,5 +31,5 @@ Unit tests are required for URL matching, field detection heuristics and phishin
 
 ## Checks to run
 ```bash
-npm run typecheck && npm run lint && npm run test && npx wxt build && npx wxt build -b firefox
+pnpm typecheck && pnpm lint && pnpm test && pnpm exec wxt build && pnpm exec wxt build -b firefox
 ```

@@ -1,5 +1,5 @@
-// Package database opens the PostgreSQL pool and applies migrations.
-package database
+// Package postgres opens the PostgreSQL pool, applies migrations, and runs transactions.
+package postgres
 
 import (
 	"context"
@@ -14,20 +14,26 @@ import (
 	"passwordmanage/server/migrations"
 )
 
+const (
+	maxConnLifetime = time.Hour
+	maxConnIdleTime = 5 * time.Minute
+	pingTimeout     = 10 * time.Second
+)
+
 func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	cfg, err := pgxpool.ParseConfig(url)
 	if err != nil {
 		return nil, fmt.Errorf("parse database url: %w", err)
 	}
-	cfg.MaxConnLifetime = time.Hour
-	cfg.MaxConnIdleTime = 5 * time.Minute
+	cfg.MaxConnLifetime = maxConnLifetime
+	cfg.MaxConnIdleTime = maxConnIdleTime
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
 
-	pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	pingCtx, cancel := context.WithTimeout(ctx, pingTimeout)
 	defer cancel()
 	if err := pool.Ping(pingCtx); err != nil {
 		pool.Close()
@@ -36,20 +42,19 @@ func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-// Migrate applies all pending migrations embedded in the binary (OPS-04).
+// Migrate applies all pending schema migrations embedded in the binary (OPS-04).
 func Migrate(ctx context.Context, url string) error {
 	db, err := sql.Open("pgx", url)
 	if err != nil {
 		return fmt.Errorf("open database for migrations: %w", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }() // migrations are committed by then; a close error cannot undo them
 
-	goose.SetBaseFS(migrations.FS)
-	goose.SetLogger(goose.NopLogger())
-	if err := goose.SetDialect("postgres"); err != nil {
-		return err
+	provider, err := goose.NewProvider(goose.DialectPostgres, db, migrations.FS)
+	if err != nil {
+		return fmt.Errorf("load migrations: %w", err)
 	}
-	if err := goose.UpContext(ctx, db, "."); err != nil {
+	if _, err := provider.Up(ctx); err != nil {
 		return fmt.Errorf("apply migrations: %w", err)
 	}
 	return nil
